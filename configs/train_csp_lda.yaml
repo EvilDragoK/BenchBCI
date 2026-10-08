@@ -1,0 +1,33 @@
+# 传统基线：CSP + LDA（BNCI2014001 session 划分，预期 ~65-70%）
+# 命令行复现：python -m core.cli train configs/train_csp_lda.yaml
+experiment:
+  name: csp_lda_2a_session
+  note: "CSP+LDA 传统基线"
+
+data:
+  processed_dir: processed/bnci2014001
+
+model:
+  name: csp_lda             # csp_lda | csp_svm | fbcsp_lda
+  params:
+    n_components: 6
+
+split:
+  scheme: session
+  k: 5
+  val_frac: 0.0
+  seed: 42
+
+normalization:
+  mode: none
+  euclidean_alignment: false
+
+augmentation: {}
+
+trainer:
+  epochs: 1
+  batch_size: 64
+  device: cpu
+
+class_balance:
+  weighted_loss: false

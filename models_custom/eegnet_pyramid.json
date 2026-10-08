@@ -1,0 +1,11 @@
+{
+  "name": "eegnet_pyramid",
+  "base": "eegnet",
+  "note": "金字塔特征（block1 多尺度池化 + block2 拼接）",
+  "created": "2026-10-05T23:03:12",
+  "shape": {
+    "n_classes": 4,
+    "n_ch": 22,
+    "n_times": 501
+  }
+}

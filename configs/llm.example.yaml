@@ -1,0 +1,23 @@
+# 论文超参抽取用的 LLM 配置模板
+#
+# 用法：复制成 configs/llm.yaml 再填密钥（该文件已在 .gitignore 中，不会被提交/分享）。
+#   也可以完全不配：训练控制台 →「从论文提取参数…」在没密钥时会用内置规则抽取（离线可用）。
+#
+# 更推荐用环境变量放密钥（避免明文落盘）：
+#   export DEEPSEEK_API_KEY=sk-xxxx          # 供应商专属变量
+#   export BCI_LLM_API_KEY=sk-xxxx           # 通用变量（任何供应商都能用）
+#
+# provider 可选：deepseek / openai / dashscope(通义千问) / moonshot(Kimi) /
+#               zhipu(GLM) / siliconflow / anthropic(Claude) / ollama(本地) / custom
+provider: deepseek
+model: deepseek-chat                 # 留空 = 用供应商默认模型
+base_url: https://api.deepseek.com/v1 # 留空 = 用供应商默认地址（Ollama: http://localhost:11434/v1）
+api_key: ""                          # 建 议 用 环 境 变 量；这里留空即可
+temperature: 0.0                     # 抽取任务建议 0（只要事实，不要发挥）
+max_tokens: 1200                     # 返回 JSON 一般很短，1200 足够
+timeout: 60                          # 秒
+max_chars: 12000                     # 论文文本超过这个长度会截断（控制成本/上下文）
+# 本地 Ollama 示例（无需密钥）：
+#   provider: ollama
+#   model: qwen2.5:7b
+#   base_url: http://localhost:11434/v1

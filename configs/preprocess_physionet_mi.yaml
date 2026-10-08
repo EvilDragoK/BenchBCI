@@ -1,0 +1,46 @@
+# PhysioNet EEG Motor Movement/Imagery Dataset (eegmmidb) 预处理流水线
+# 命令行复现：python -m core.pipeline configs/preprocess_physionet_mi.yaml
+#
+# 数据概况：109 名被试 × 14 run，64 通道 EEG，160 Hz；美国数据 → 工频 60 Hz
+# 默认 runs = 官方「纯运动想象」6 个 run（重要：PhysioNet 是「每个任务占每 4 个 run 中的
+# 同一个」，**不是**相邻两两配对；写错会把真实动作 run 当成想象 run、标签也会错）：
+#   Task2 想象左/右手握拳：      R04 / R08 / R12
+#   Task4 想象双手握拳/双脚踏步：R06 / R10 / R14
+#   （真实动作任务：Task1 R03/R07/R11、Task3 R05/R09/R13，标签带 _real 后缀）
+name: physionet_mi_4class
+
+dataset:
+  kind: physionet_mi                       # 数据集类型：physionet_mi | bnci2014001
+  # 换机器/换系统：设环境变量 BCI_DATA_ROOT 指向数据集根目录即可，无需改本文件
+  root: ${BCI_DATA_ROOT:-~/Desktop/DL/BCI/data}/PhysioNet_MI
+  subjects: "1-109"                        # 全量 109 人较慢，可先试 "1-10"
+  runs: [4, 6, 8, 10, 12, 14]              # 纯想象 6 run（[3,7,11] 真实左/右手等）
+  eeg_only: true
+
+steps:
+  - op: set_montage
+    params: {montage: standard_1005}
+    enabled: true
+  - op: notch_filter
+    params: {freqs: [60]}                  # 美国数据：60 Hz 工频（BNCI 是 50 Hz）
+    enabled: true
+  - op: bandpass_filter
+    params: {l_freq: 0.5, h_freq: 45.0, method: fir, iir_order: 4}
+    enabled: true
+  - op: re_reference
+    params: {mode: average, channels: []}
+    enabled: true
+  - op: epoching
+    params: {tmin: 0.0, tmax: 4.0, baseline: false, classes: []}  # 任务提示后 0~4s
+    enabled: true
+  - op: amplitude_reject
+    # PhysioNet 原始数据伪迹较多（前额电极眼动污染强，ptp 中位数即达数百 µV）
+    # 实测阈值与保留率：150µV→8%，200µV→32%，300µV→42%，500µV→73%
+    # 故这里用 500 µV；若需更严格清洗，请启用 ICA 步骤而非收紧阈值
+    params: {threshold_uv: 500.0}
+    enabled: true
+
+output:
+  dir: processed/physionet_mi
+  save_fif: true
+  save_npy: true

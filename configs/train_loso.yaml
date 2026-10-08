@@ -1,0 +1,34 @@
+# LOSO（Leave-One-Subject-Out）跨被试泛化评测
+# 每次留出一名被试做测试，其余被试的全部 session 训练；重复 N 次（N=被试数）
+# 命令行：python -m core.cli train configs/train_loso.yaml
+experiment:
+  name: csp_lda_loso_2a
+  note: "跨被试 LOSO：留一被试，其余被试 T+E 训练"
+
+data:
+  processed_dir: processed/bnci2014001       # 需含多名被试的数据
+
+model:
+  name: csp_lda
+  params:
+    n_components: 6
+
+split:
+  scheme: loso
+  test_session: all      # 留出被试用哪些 session 测试：all / T / E
+  val_frac: 0.0          # LOSO 折数少，通常不额外切验证集
+  seed: 42
+
+normalization:
+  mode: zscore_channel
+  euclidean_alignment: true   # 跨被试强烈建议开启 EA（逐被试无标签对齐）
+
+augmentation: {}
+
+trainer:
+  epochs: 1
+  batch_size: 64
+  device: cpu
+
+class_balance:
+  weighted_loss: false

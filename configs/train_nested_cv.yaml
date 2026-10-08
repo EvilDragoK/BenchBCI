@@ -1,0 +1,28 @@
+# 嵌套交叉验证：外层折（逐被试 k 折）用于评估，内层在每折训练集内部再切
+# inner_k 折来挑选超参 —— 超参不接触测试折，指标无偏。
+# 命令行复现：python -m core.cli train configs/train_nested_cv.yaml
+experiment:
+  name: csp_lda_nested_cv
+  note: "嵌套 CV（外层逐被试 5 折 + 内层 3 折选 CSP 分量数）"
+
+data:
+  processed_dir: processed/bnci2014001
+
+model:
+  name: csp_lda
+  params: {n_components: 6}      # 会被 param_grid 覆盖
+
+split:
+  scheme: nested_cv
+  k: 5                # 外层折数
+  inner_k: 3          # 内层折数
+  param_grid:         # 内层挑选的候选（键=模型参数，值=候选列表）
+    n_components: [2, 4, 6, 8]
+    # 神经网络示例：F1: [8, 16] / dropout: [0.25, 0.5]
+  val_frac: 0.15
+  seed: 42
+
+normalization: {mode: zscore_channel, euclidean_alignment: false}
+augmentation: {}
+trainer: {epochs: 60, batch_size: 64, lr: 0.001, device: auto}
+class_balance: {weighted_loss: true}

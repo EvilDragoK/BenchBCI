@@ -1,0 +1,39 @@
+# Within-Subject Few-Shot：被试内每类仅用 n 个样本校准
+# 每被试每类抽 n_shot 个训练、其余测试，重复 n_repeats 次取平均
+# 命令行：python -m core.cli train configs/train_fewshot.yaml
+experiment:
+  name: csp_lda_fewshot5_2a
+  note: "被试内 5-shot 校准（Within-Subject Few-Shot）"
+
+data:
+  processed_dir: processed/bnci2014001
+
+model:
+  name: csp_lda
+  params:
+    n_components: 6
+
+split:
+  scheme: few_shot
+  n_shot: 5              # 每类训练样本数（可试 1/5/10/20 画学习曲线）
+  n_repeats: 1           # 1 = 每名被试一折（共 9 折，与 EEG-FM-Benchmark 一致）
+                         # 画学习曲线时设为 5~10，重复采样取平均更稳
+                         # （折数 = 被试数 × n_repeats）
+  train_percentage: null # 若填 0.3，则改用「每被试每类 30%」而非固定 n_shot
+  test_session: T        # 在哪个 session 内抽样：all / T / E
+  val_frac: 0.0          # 训练样本本就极少，不再切验证集
+  seed: 42
+
+normalization:
+  mode: zscore_channel
+  euclidean_alignment: false
+
+augmentation: {}
+
+trainer:
+  epochs: 1
+  batch_size: 64
+  device: cpu
+
+class_balance:
+  weighted_loss: false

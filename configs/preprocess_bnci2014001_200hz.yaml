@@ -1,0 +1,43 @@
+# 供 EEG 基础模型（CBraMod / LaBraM / EEGPT …）使用的预处理流水线
+# 与标准版差别：**重采样到 200 Hz**（这些模型多在 200 Hz、patch=200 点上预训练）。
+# 分段仍取 cue 后 0.5–2.5 s（200 Hz 下 401 点；训练时会自动裁剪到 patch 的整数倍 400）。
+# 命令行：python -m core.pipeline configs/preprocess_bnci2014001_200hz.yaml
+name: bnci2014001_200hz
+
+dataset:
+  # 换机器/换系统：设环境变量 BCI_DATA_ROOT 指向数据集根目录即可，无需改本文件
+  root: ${BCI_DATA_ROOT:-~/Desktop/DL/BCI/data}/BNCI2014001
+  subjects: "1-9"
+  sessions: [T, E]
+  eeg_only: true
+
+steps:
+  - op: set_montage
+    params: {montage: standard_1005}
+    enabled: true
+  - op: pick_eeg
+    params: {keep_eog: false}
+    enabled: true
+  - op: notch_filter
+    params: {freqs: [50]}
+    enabled: true
+  - op: bandpass_filter
+    params: {l_freq: 4.0, h_freq: 40.0, method: fir, iir_order: 4}
+    enabled: true
+  - op: resample
+    params: {sfreq: 200.0}          # ← 基础模型要求 200 Hz
+    enabled: true
+  - op: re_reference
+    params: {mode: average, channels: []}
+    enabled: true
+  - op: epoching
+    params: {tmin: 0.5, tmax: 2.5, baseline: true, classes: []}
+    enabled: true
+  - op: amplitude_reject
+    params: {threshold_uv: 150.0}
+    enabled: true
+
+output:
+  dir: processed/bnci2014001_200hz
+  save_fif: false                   # 基础模型只用 npy，省 200+ MB
+  save_npy: true

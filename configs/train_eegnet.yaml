@@ -1,0 +1,52 @@
+# EEGNet 基线训练配置（BNCI2014001，session 划分：T 训练 / E 测试）
+# 命令行复现：python -m core.cli train configs/train_eegnet.yaml
+experiment:
+  name: eegnet_2a_session
+  note: "EEGNet 基线，T 训练 / E 测试"
+
+data:
+  processed_dir: processed/bnci2014001
+
+model:
+  name: eegnet
+  params:
+    F1: 8
+    F2: 16
+    D: 2
+    kernel_length: 125     # 0.5 s @ 250 Hz（内部会取奇数）
+    dropout: 0.25
+  # ---- 可选：预训练权重 + 微调策略（留空/删除即从零训练）----
+  # pretrained: experiments/20261005_111848_eegnet_2a_session/checkpoints/ckpt_best.pt
+  # finetune: full         # full = 全参数微调；head_only = 冻结编码器，只训练分类头
+
+split:
+  scheme: session          # session | kfold | loso | holdout
+  k: 5
+  val_frac: 0.15
+  seed: 42
+
+normalization:
+  mode: zscore_channel     # 统计量仅来自训练折
+  euclidean_alignment: false
+
+augmentation:
+  time_shift: 0            # 采样点
+  gaussian_noise: 0.0      # 相对每通道 std
+  channel_dropout: 0.0
+
+trainer:
+  epochs: 60
+  batch_size: 64
+  lr: 0.001
+  optimizer: adamw
+  weight_decay: 0.01
+  scheduler: cosine
+  patience: 12
+  amp: auto                 # cuda 自动开启，mps/cpu 关闭
+  seed: 42
+  deterministic: false
+  device: auto              # auto = cuda > mps > cpu
+  num_workers: 0
+
+class_balance:
+  weighted_loss: true

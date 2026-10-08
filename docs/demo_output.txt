@@ -1,0 +1,258 @@
+==========================================================================
+BCI Lab 功能演示与自检（每个功能真跑一遍；✔ 通过 / ✘ 失败）
+==========================================================================
+
+──────────────────────────────────────────────────────────────────────────
+◆ 1. 数据读取（BNCI / PhysioNet / 通用格式）
+──────────────────────────────────────────────────────────────────────────
+    支持格式：.edf, .bdf, .gdf, .vhdr, .fif, .cnt, .set, .mat, .npy
+  ✔ BNCI2014001：被试 [1, 2, 3, 4, 5, 6, 7, 8, 9]，session T/E
+  ✔ 被试 1 T：22 通道 / 250 Hz / 288 trial / 时长 2687s
+  ✔ 官方 22 导联表（末 4 个 = ['P1', 'Pz', 'P2', 'POz']；无 Oz/CP5/CP6）
+  ✔ 类别 {'left_hand': 72, 'right_hand': 72, 'feet': 72, 'tongue': 72}；cue 偏移 = 2.0s
+  ✔ PhysioNet 纯想象 run = [4, 6, 8, 10, 12, 14]（R04/08/12 想象左右手、R06/10/14 想象双手双脚）
+  ✔ run→任务映射符合官方分组（R05 真实、R06 想象）
+    PhysioNet 根目录可用：~/Desktop/DL/BCI/data/PhysioNet_MI
+
+──────────────────────────────────────────────────────────────────────────
+◆ 2. 预处理（19 个算子 / 真实数据全链路）
+──────────────────────────────────────────────────────────────────────────
+    算子清单：set_montage、pick_eeg、drop_channels、mark_bad_channels、interpolate_bads、notch_filter、bandpass_filter、gaussian_filter、resample、normalize、re_reference、reject_bad_segments、clip_outliers、artifact_regression、ica、epoching、amplitude_reject、reject_outlier_epochs、euclidean_alignment
+  ✔ 12 步真实数据全链路 → 284 epochs（输入 22 通道）
+  ✔ 导联定位：22 个电极拿到坐标（['Fz', 'FC3', 'FC1']…）
+  ✔ 坏段检测：0 段 / 0.0s
+  ✔ 去极值裁剪：0 个采样点
+  ✔ ICA 自动判定：建议剔除 [5]，候选 [5, 7]
+  ✔ 伪迹代理通道 = ['Fz']（无 EOG 时退到最前额电极）
+    分段统计：分段前 288 个 trial → 保留 284，坏段丢弃 0，离群丢弃 4
+  ✔ REST 重参考：数据全有限（max|V| = 43.1 µV）
+
+──────────────────────────────────────────────────────────────────────────
+◆ 3. 手工特征工程（频谱/熵/复杂度/Hjorth/连接）
+──────────────────────────────────────────────────────────────────────────
+    特征表 FEATURES（13 项）：['AP', 'APR', 'DE', 'SHE', 'SPE', 'C0', 'NSI', 'HOC', 'DASM', 'RASM']…
+  ✔ 绝对频带功率 (N,C,B) = (8, 4, 2)；alpha 均值 30.7 µV²
+  ✔ 相对频带功率各频带之和 = 100.0000%
+  ✔ 微分熵 (N,C,5 频带) = (8, 4, 5)
+  ✔ θ/β 比值：均值 0.228
+  ✔ C0 复杂度 (N,C) = (8, 4)
+  ✔ 谱熵 (N,C) = (8, 4)
+    另含：hoc、nsi、hemisphere_pairs、dasm、rasm、hilbert_timf、functional_connectivity 等函数
+
+──────────────────────────────────────────────────────────────────────────
+◆ 4. 张量数据集、归一化（防泄漏）、欧几里得对齐、数据增强
+──────────────────────────────────────────────────────────────────────────
+    归一化模式（14）：['zscore_channel', 'zscore_epoch', 'minmax_channel', 'minmax_pm', 'minmax_epoch', 'minmax_pm_epoch', 'p95', 'x_div', 'iqr', 'quantile', 'alaw', 'ema', 'zero_mean', 'none']
+  ✔ zscore_channel   训练/测试都有限
+  ✔ minmax_channel   训练/测试都有限
+  ✔ zscore_epoch     训练/测试都有限
+  ✔ quantile         训练/测试都有限
+  ✔ 防泄漏：统计量只来自训练折（用同一统计量变换测试集）
+  ✔ 逐被试 EA：各被试协方差偏离单位阵最大 0.004
+  ✔ 数据增强（平移 8 点 + 高斯噪声 0.1 + 通道 dropout 0.1）输出形状 torch.Size([8, 8, 256])
+
+──────────────────────────────────────────────────────────────────────────
+◆ 5. 模型：内置 6 个 + 基础模型 + 自定义模型
+──────────────────────────────────────────────────────────────────────────
+    内置 Torch 模型：['eegnet', 'shallowconvnet', 'deepconvnet', 'fbcnet', 'conformer']
+    传统基线：['csp_lda', 'csp_svm', 'fbcsp_lda']
+    下拉框全部可用：['eegnet', 'shallowconvnet', 'deepconvnet', 'fbcnet', 'conformer', 'csp_lda', 'csp_svm', 'fbcsp_lda', 'eegnet_pyramid']
+  ✔ eegnet         前向输出 (2, 4)，参数 2.7k
+  ✔ shallowconvnet 前向输出 (2, 4)，参数 18.2k
+  ✔ deepconvnet    前向输出 (2, 4)，参数 269.7k
+  ✔ fbcnet         前向输出 (2, 4)，参数 5.7k
+  ✔ conformer      前向输出 (2, 4)，参数 119.9k
+    最小可用输入时长（采样点，250 Hz 下 64≈0.26s / 500≈2s）：eegnet=64、shallowconvnet=128、deepconvnet=500、fbcnet=64、conformer=64
+  ✔ 经典基线 CSP+LDA 预测 (4,)，类别 [0 1 2 3]
+  ✔ 自定义模型检查：输入 [2, 1, 8, 500] → 输出 [2, 4]，14 层 / 2.7k 参数，目标类别数 4 一致
+    逐层维度追踪（前 4 层）：(2, 8, 8, 500) → (2, 8, 8, 500) → (2, 16, 1, 500) → (2, 16, 1, 500)
+  ✔ 保存为新模型 → demo_eegnet_pyramid.py（训练页下拉框即时可见）
+  ✔ 训练路径可直接构建该自定义模型，输出 (2, 4)
+  ✔ 类别数写错的代码被拦下：输出维度不对：期望输出 (batch=2, n_classes=4)，实际 (2, 5)。常见原因：分类头 Li…
+  ✔ 时窗太短时的报错可操作：→ 最常见原因是**输入时窗太短**：卷积 + 池化后时间维被压到 0/1。经验最小时长（采样点）：EEGNet…
+  ✔ 删除自定义模型生效
+    EEG 基础模型（需 braindecode + 预训练权重）：['labram', 'cbramod', 'eegpt', 'biot', 'bendr', 'signaljepa', 'brant', 'brainbert', 'eegdino', 'codebrain', 'luna', 'neurogpt', 'brainomni', 'eegmamba', 'single', 'tfmtokenizer']
+  ✔ is_custom 对未知名字返回 False
+
+──────────────────────────────────────────────────────────────────────────
+◆ 6. 划分协议（9 种）与防泄漏
+──────────────────────────────────────────────────────────────────────────
+    协议               折数  train   val  test  泄漏检查
+    session           3     40     8    48  ✔ train/val/test 互不重叠
+    loso              3    163    29    96  ✔ train/val/test 互不重叠
+    session_kfold     6     40     8    48  ✔ train/val/test 互不重叠
+    kfold             9     54    10    32  ✔ train/val/test 互不重叠
+    within            3     54    10    32  ✔ train/val/test 互不重叠
+    few_shot          3     16     0    80  ✔ train/val/test 互不重叠
+    subject_kfold     3    163    29    96  ✔ train/val/test 互不重叠
+    holdout           1    195    35    58  ✔ train/val/test 互不重叠
+    block             8     39     8    49  ✔ train/val/test 互不重叠
+    custom            1    163    29    96  ✔ train/val/test 互不重叠
+  ✔ 10 种协议首折均无索引重叠（含 val 不泄漏进 train）
+    数据规模：3 被试 × 2 session × 4 类 × 12 = 288 个 trial
+
+──────────────────────────────────────────────────────────────────────────
+◆ 7. 训练（后台线程/断点续训/早停）与评测指标
+──────────────────────────────────────────────────────────────────────────
+  ✔ ITR（Wolpaw）：acc=0.6/4 类/8s → 2.963 bits/min（与公式一致）
+    最近一次实验：20261008_112358_my_run
+      acc=58.85% ± 0.00%，kappa=0.451，ITR=2.78 bits/min，折数 1
+      summary 指标键：['acc_mean', 'acc_per_fold', 'acc_std', 'auc_macro_mean', 'auc_macro_std', 'auc_pr_macro_mean', 'auc_pr_macro_std', 'balanced_acc_mean', 'balanced_acc_std', 'brier_mean', 'brier_std', 'confusion_total']…
+  ✔ 实验摘要含 acc/kappa/ITR/混淆矩阵，可凭 config.yaml 复现
+    双实验对比（一致性检查 + 指标对照）可用：True
+
+──────────────────────────────────────────────────────────────────────────
+◆ 8. ERP：叠加平均 / 多条件 / 成分提取 / 统计检验 / 地形图
+──────────────────────────────────────────────────────────────────────────
+  ✔ 叠加平均（条件 target，n=60）→ (4, 250)
+  ✔ 多条件叠加 → [('std', (4, 250), 60), ('target', (4, 250), 60)]
+    平均波形成分：N1 112ms/-0.8µV，P2 164ms/0.8µV，N2 244ms/-0.3µV，P3 420ms/26.0µV
+  ✔ 逐试次成分提取 → amplitude (120, 4)
+    P3 幅值检验（std vs target）：t=-82.9，p(FDR)=4.12e-106，d=-15.1
+  ✔ 注入的 P3 条件差异被检出（t<0、FDR 后 p<0.001）
+  ✔ 未注入差异的 N1 效应量很小（|d|max=0.18）
+
+──────────────────────────────────────────────────────────────────────────
+◆ 9. 时频：Morlet/多窗/STFT + ERD-ERS + 地形图 + 统计 + 导出
+──────────────────────────────────────────────────────────────────────────
+    morlet      → power(20, 4, 41, 500)，4–44 Hz，500 个时间点
+    multitaper  → power(20, 4, 41, 500)，4–44 Hz，500 个时间点
+    stft        → power(20, 4, 18, 43)，2–45 Hz，43 个时间点
+  ✔ 三种方法输出形状一致（可直接互换）
+  ✔ 10 Hz 正弦的功率峰值落在 10 Hz 频点
+  ✔ ERD/ERS 基线均值 = -1.13e-15%（应为 0）
+  ✔ 频段×时间窗地形图 → (20, 4)（α 频段 ['theta', 'alpha', 'beta', 'gamma']）
+  ✔ 逐通道检验：t = [4.7 5.9 5.3 4.7]，p(FDR) < 0.01，d = [1.  1.3 1.2 1.1]
+  ✔ 导出 CSV 表：164 行 × 502 列
+
+──────────────────────────────────────────────────────────────────────────
+◆ 10. 功率谱密度：3 种谱估计 + 相对功率 + 逐通道统计 + 导出
+──────────────────────────────────────────────────────────────────────────
+  ✔ welch        → (12, 4, 45)，10 Hz 处为谱峰
+  ✔ periodogram  → (12, 4, 177)，10 Hz 处为谱峰
+  ✔ multitaper   → (12, 4, 177)，10 Hz 处为谱峰
+  ✔ 相对功率各频带之和 = 100.0000%
+  ✔ 导出表：绝对（61 列，dB）/ 相对（['delta', 'theta', 'alpha', 'beta', 'gamma']）
+  ✔ 逐通道 alpha 功率检验：t=[-0.53 -0.09 -0.3  -3.71]，p(FDR)=[0.932 0.932 0.932 0.016]
+
+──────────────────────────────────────────────────────────────────────────
+◆ 11. 非线性：样本熵 / 近似熵 / 排列熵
+──────────────────────────────────────────────────────────────────────────
+  ✔ 样本熵：噪声 2.328 > 正弦 0.289 ≥ 常数 0.000（越不规则越大）
+  ✔ 近似熵：噪声 1.468 > 正弦 0.184 ≥ 常数 0.000（越不规则越大）
+  ✔ 排列熵：噪声 0.999 > 正弦 0.542 ≥ 常数 -0.000（越不规则越大）
+  ✔ A=0 的极端情形返回理论上界 log(B)=1.0986（旧实现会给 0.0，方向相反）
+  ✔ 逐通道熵 = ['sample', 'approximate', 'permutation']，形状 (3,)
+
+──────────────────────────────────────────────────────────────────────────
+◆ 12. 脑网络：12 种连接 + 图指标 + 稀疏化 + 生物标志物
+──────────────────────────────────────────────────────────────────────────
+    连接方法 → 输出形状：corr(16, 6, 6)，spearman(6, 6)，partial(6, 6)，mi(6, 6)，coh(16, 6, 6)，plv(16, 6, 6)，pli(16, 6, 6)，wcoherence(6, 6)，hofc(15, 15)，sparse_repr(6, 6)，low_rank(6, 6)，granger(6, 6)
+  ✔ 逐 trial 与跨 trial 方法都可计算，结果有限
+  ✔ 二值化密度 0.3 → 4 条边（目标 4.5）；平均度 1.3
+  ✔ 完全图校验：全局效率 1.000、聚类 1.000（应为 1）
+  ✔ 5 种稀疏化策略都可用：['none', 'proportional', 'absolute', 'adaptive', 'mst']
+  ✔ 生物标志物：注入的判别连接 [{1, 2}, {1, 3}, {1, 5}]… 被检出，FDR 校正后显著边数 = 1（未校正的原始 p 更小 → 见 p_corrected）
+  ✔ 动态连接 → 窗口 (2, 6, 6)（时间点 [0.5 1. ]…）
+  ✔ 静态连接图 → (16, 6, 6)（逐 trial 时自行按 trial 平均即得网络）
+
+──────────────────────────────────────────────────────────────────────────
+◆ 13. 非时序脑网络：结构协变 / 相似性 / 滞后 / 外部矩阵导入导出
+──────────────────────────────────────────────────────────────────────────
+  ✔ T1 结构协变：(30, 8) 表 → 协变矩阵 (8, 8)（对称、对角 1）
+  ✔ 个体相似性网络：['pearson', 'spearman', 'kl', 'jsd', 'mind'] 5 种指标 → 均为 (30,30)
+  ✔ 有效连接滞后矩阵：(2, 2)（['parabolic', 'cubic'] 两种插值可选）
+  ✔ 外部矩阵导入导出：.npy / .csv / .mat 三种格式往返一致（带 ROI 标签）
+
+──────────────────────────────────────────────────────────────────────────
+◆ 14. 影像（可选依赖）：NIfTI + 图集 → ROI 时序/数值
+──────────────────────────────────────────────────────────────────────────
+    nibabel 可用 → 可直接读 NIfTI、按图集抽 ROI 时序
+    内置可选图集：['harvard_oxford_cortl', 'harvard_oxford_cortr', 'harvard_oxford_sub']…
+  ✔ ROI 时序/数值提取接口存在
+
+──────────────────────────────────────────────────────────────────────────
+◆ 15. 实验管理：目录 + SQLite 索引 + 失效记录过滤
+──────────────────────────────────────────────────────────────────────────
+  ✔ 实验目录结构：['checkpoints', 'config.yaml', 'figures', 'log.txt', 'metrics.csv', 'summary.json']
+  ✔ 目录被删后列表自动过滤该记录（不再出现点进去报错的行）
+
+──────────────────────────────────────────────────────────────────────────
+◆ 16. 变量关联分析（RF 重要性 + Pearson + LMM，Linked Heatmap）
+──────────────────────────────────────────────────────────────────────────
+  ✔ 写出一张变量表（含文本分组列 subject）：sim.csv
+    变量关联分析：240 行 × 8 个自变量
+    随机森林（400 棵树）：R²(训练)=0.877，R²(留出 60 行)=0.546；Top-3 重要变量 = ['x1', 'x2', 'x3']
+    相关矩阵：|r| 最大的一对 = x4–x6 r=-0.14
+    LMM 效应：显著（p<0.05）3/8 个变量 → x1(β=+0.61)、x2(β=-0.49)、x3(β=+0.10)
+      [效应模型] 随机截距方差 = 0.241（8 组 × 平均 30.0 次观测）
+  ✔ RF 重要性把真驱动变量排在最前（x1=0.447、x2=0.396，噪声最大 0.0084）
+  ✔ LMM 恢复出方向与显著性（x1 β=+0.61 p=8.3e-161；x2 β=-0.49 p=2.2e-101）
+  ✔ 纯噪声变量未被误判显著（none）
+    变量关联分析：900 行 × 8 个自变量
+    已对目标变量与自变量取 log10（正偏重尾指标建议开启）
+    随机森林（300 棵树）：R²(训练)=0.952，R²(留出 225 行)=0.832；Top-3 重要变量 = ['entropy_Cz', 'alpha_C4', 'alpha_POz']
+    相关矩阵：|r| 最大的一对 = alpha_Pz–alpha_POz r=+0.91
+    LMM 效应：显著（p<0.05）5/8 个变量 → alpha_Pz(β=+0.08)、alpha_POz(β=+0.25)、alpha_C3(β=+0.12)、alpha_C4(β=+0.27)、entropy_Cz(β=-0.22)
+      [效应模型] 随机截距方差 = 0.0463（9 组 × 平均 100.0 次观测）
+      [效应模型] 随机效应协方差接近奇异：说明组间差异很小，效应估计与 OLS 基本相同（结果仍可用，但不必强调随机效应）
+  ✔ 真实数据（900 个 epoch，分组 = 9 名被试）：8 个指标的 LMM 效应 + RF 重要性一次算出
+    显著指标：alpha_Pz(β=+0.08, p=3.8e-02)、alpha_POz(β=+0.25, p=7.4e-10)、alpha_C3(β=+0.12, p=1.3e-03)、alpha_C4(β=+0.27, p=1.4e-12)、entropy_Cz(β=-0.22, p=1.3e-25)
+    真实数据三联图 → experiments/linked_heatmap_bnci.png
+  ✔ 结果可导出三张表：{'importance.csv': 8, 'pearson.csv': 8, 'effects.csv': 8}（重要性/相关/效应）
+  ✔ 成图 → experiments/linked_heatmap_demo.png
+    读图：顶部看重要性、中间看相关、底部看模型效应；相关 ≠ 因果，RF 重要性本身不含方向
+
+──────────────────────────────────────────────────────────────────────────
+◆ 17. 论文超参抽取（LLM 可选 + 内置规则兜底，识别 epoch/bs/lr/优化器/种子/标准化/EA/增强）
+──────────────────────────────────────────────────────────────────────────
+    [规则] 命中 12 个字段：epochs, batch_size, lr, optimizer, weight_decay, scheduler, seed, normalization, euclidean_alignment, augmentation, augmentation_types, split_scheme
+    [规则] 命中 11 个字段：epochs, batch_size, lr, optimizer, weight_decay, scheduler, seed, normalization, euclidean_alignment, augmentation, split_scheme
+  ✔ 英文段落（离线规则）：epochs=200、bs=64、lr=0.001、opt=adamw、seed=42、norm=zscore_channel、EA=True、增强=True
+  ✔ 中文段落 + 否定表述：epochs=100、lr=0.0005、EA=False（未使用欧几里得对齐）、增强=False（未使用数据增强）
+  ✔ 每个识别值都带原文依据，例如 EA → 「…th a z-score computed per channel. We applied…」
+  ✔ 可直接映射成训练配置：trainer/normalization/augmentation 三段都有值（augmentation={'channel_dropout': 0.1, 'gaussian_noise': 0.1, 'time_shift': 25.0}）
+  ✔ 论文明确「未使用数据增强」→ 覆盖掉已有增强开关（三个全 0）
+    [规则] 命中 12 个字段：epochs, batch_size, lr, optimizer, weight_decay, scheduler, seed, normalization, euclidean_alignment, augmentation, augmentation_types, split_scheme
+    [LLM] DeepSeek（深度求索） · deepseek-chat · https://api.deepseek.com/v1 返回 346 字，耗时 0.0s
+    [LLM] 命中 6 个字段：epochs, batch_size, lr, optimizer, augmentation, augmentation_types
+    [核对] 这些字段 LLM 与规则不一致，已保留 LLM 结果并标注原文依据：['lr', 'augmentation_types']
+  ✔ LLM 与规则不一致时保留 LLM 值并**标注冲突**（lr=0.0003，LLM（与规则不一致），依据=learning rate = 3e-4）
+  ✔ 两边一致时标为「LLM + 规则一致」（可放心采用）
+  ✔ 平台不支持的手段（mixup）单独列出、不静默丢弃（{'time_shift': 25.0, 'unsupported_types': ['mixup']}）
+    [规则] 命中 12 个字段：epochs, batch_size, lr, optimizer, weight_decay, scheduler, seed, normalization, euclidean_alignment, augmentation, augmentation_types, split_scheme
+    [LLM] DeepSeek（深度求索） · deepseek-chat · https://api.deepseek.com/v1 返回 7 字，耗时 0.0s
+    [警告] LLM 调用失败（RuntimeError: 模型输出不是合法 JSON：抱歉，无法回答）→ 已降级为规则抽取
+  ✔ 模型返回非 JSON → 自动降级到规则，并给出警告
+  ✔ 密钥/网络报错 → 同样降级（功能不塌），警告里保留原始错误
+    [读取] Smith2023_main.pdf（论文正文，1 页，262 字）
+    [读取] Smith2023_supplementary.pdf（补充材料，1 页，598 字）
+  ✔ 拖进两个 PDF 能自动区分正文/补充材料：{'Smith2023_main.pdf': 'main', 'Smith2023_supplementary.pdf': 'supplementary'}
+    [组装] 2 个来源 → 898 字
+        优先小节：Smith2023_supplementary.pdf（补充材料）｜S2 Implementation details
+        [提示] Smith2023_main.pdf：没找到 Implementation details / 超参数 之类的小节，已取开头文本兜底
+        [提示] Smith2023_main.pdf：正文提到「详见补充材料/附录」——参数很可能在补充材料里，建议把补充材料一起拖进来（本次已优先解析补充材料）
+  ✔ 组装时补充材料排在正文之前，用的是「Smith2023_supplementary.pdf（补充材料）｜S2 Implementation details」
+  ✔ 正文里写着「详见补充材料」时给出提示（参数确实不在正文）
+    [规则] 命中 11 个字段：epochs, batch_size, lr, optimizer, weight_decay, scheduler, seed, normalization, euclidean_alignment, augmentation, augmentation_types
+  ✔ 从 PDF 组装文本里抽到超参：{'epochs': 200, 'batch_size': 64, 'lr': 0.001, 'optimizer': 'adamw', 'seed': 42}（随机种子的长连接词写法也能读）
+  ✔ 溯源齐全：每个来源文件 sha256 + 采用小节 + 每个字段的原文依据
+  ✔ 参数来源随 config.yaml 落盘到实验目录（半年后能查「这套超参抄自哪一节」）
+  ✔ 实验报告 report.md 自动带「训练参数来源」一节（含依据与来源文件）
+  ✔ 实验列表备注里的一行来源：Smith2023_main.pdf（论文正文）、Smith2023_supplementary.pdf（补充材料） · 规则抽取 · 取自 Smith2023_supplementary.pdf（补充材料）｜S2 Implementation details
+  ✔ 配置判定：本地 Ollama 无需密钥即认为可用；云端缺密钥则自动走规则
+    供应商：9 个（DeepSeek、OpenAI、阿里云百炼、Moonshot Kimi、智谱 GLM、硅基流动 SiliconFlow…）；密钥只从环境变量或 configs/llm.yaml 读，不硬编码
+
+──────────────────────────────────────────────────────────────────────────
+◆ 18. 图形界面：5 页 + 可折叠步骤栏 + 主题 + 对话框
+──────────────────────────────────────────────────────────────────────────
+  ✔ 功能页：['数据管理', '预处理工作台', '训练控制台', '结果分析', '信号分析']
+  ✔ 全局字体栈：['Times New Roman', 'Songti SC', 'STSong', 'SimSun']（数字/字母 Times New Roman + 中文宋体）
+  ✔ 主题：['浅紫粉', '夜兰樱雾', '海雾松岚', '赤陶海铜']（默认「浅紫粉」，菜单可切换）
+  ✔ 左侧步骤栏可折叠：46px（展开 210px）
+  ✔ 窗口最小宽度 1679px（布局不溢出，笔记本可用）
+    对话框：brain3d_dialog, code_viewer_dialog, curve_widget, demo_dialog, device_dialog, feature_dialog, folds_dialog, ica_dialog, model_editor_dialog, netmatrix_dialog, paper_extract_dialog, pipeline_preview_dialog, psd_dialog, signal_browser, split_intro_dialog, topo_dialog
+
+==========================================================================
+演示结束：耗时 15.0s，失败 0 项
+==========================================================================

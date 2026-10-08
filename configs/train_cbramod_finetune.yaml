@@ -1,0 +1,52 @@
+# CBraMod 基础模型微调示例（预训练权重 + 冻结编码器 + 分层学习率）
+#
+# 前置：
+#   pip install braindecode huggingface_hub safetensors einops
+#   数据需符合模型要求（CBraMod：200 Hz、patch=200 点，n_times 建议为 200 的倍数）
+#
+# 命令行复现：python -m core.cli train configs/train_cbramod_finetune.yaml
+experiment:
+  name: cbramod_finetune
+  note: "CBraMod 预训练权重 + 冻结编码器 + 分层学习率"
+
+data:
+  processed_dir: processed/bnci2014001      # 若数据非 200 Hz，请先重采样
+
+model:
+  name: cbramod
+  params: {}
+  pretrained: auto          # auto = 自动下载 braindecode/cbramod-pretrained
+  # 也可写成：
+  #   pretrained: hf:braindecode/cbramod-pretrained/model.safetensors   （单文件直链）
+  #   pretrained: ~/.cache/bci_lab/pretrained/xxx/model.safetensors     （本地）
+  freeze: encoder           # none | encoder | all_but_head | custom
+  trainable: []             # freeze=custom 时填，如 [classifier, proj_out]
+
+split:
+  scheme: session           # 换任意协议都可以
+  val_frac: 0.15
+  seed: 42
+
+normalization:
+  mode: zscore_channel
+  euclidean_alignment: false
+
+augmentation: {}
+
+trainer:
+  epochs: 30
+  batch_size: 64
+  lr: 1.0e-3                # 分类头（新初始化层）—— 大学习率
+  lr_encoder: 1.0e-5        # 编码器（预训练主干）—— 小学习率；0 表示与 lr 相同
+  layer_decay: 0.9          # <1 启用逐层衰减：底层小、高层大
+  optimizer: adamw
+  weight_decay: 0.01
+  scheduler: cosine
+  patience: 10
+  device: auto
+
+class_balance:
+  weighted_loss: true
+
+evaluation:
+  trial_seconds: 8.0        # 用于 ITR 计算

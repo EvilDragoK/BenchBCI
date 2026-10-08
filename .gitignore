@@ -1,0 +1,32 @@
+# ---- Python / 运行环境（克隆后需要自己重建，不要上传）----
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+
+# ---- 系统 / IDE ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.codebuddy/
+
+# ---- 数据与实验产物（体积大 / 含被试隐私；换机器时重新生成）----
+processed/
+experiments/
+*.log
+
+# ---- 密钥：绝对不要提交（模板见 configs/llm.example.yaml）----
+configs/llm.yaml
+
+# ---- 保险：万一把 SSH 密钥误生成在项目目录里，也别让它进仓库 ----
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+id_ecdsa
+id_ecdsa.pub
+*.pem
+*.ppk

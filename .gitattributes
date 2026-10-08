@@ -1,0 +1,24 @@
+# 换行符统一：仓库内一律 LF，检出到 Windows 也不会把 .py/.md/.yaml 变成 CRLF，
+# 这样 macOS 与 Windows 之间来回协作不会出现"整文件 diff"的假改动。
+* text=auto eol=lf
+
+# Windows 批处理必须是 CRLF，否则可能在 cmd 下报错
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制文件不做任何文本/换行转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.npy binary
+*.npz binary
+*.mat binary
+*.pt binary
+*.pth binary
+*.onnx binary
+*.zip binary
+*.gz binary
+*.db binary

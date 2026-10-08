@@ -1,0 +1,31 @@
+# 被试内划分（within-subject）—— 对齐 EEG-FM-Benchmark 的协议：
+#   · 每名被试一折（折数 = 被试数），训练/测试都来自同一被试
+#   · 训练集按「每被试每类」比例抽取 train_percentage（该基准默认 0.3）
+#   · 验证集从训练集内部划出（val_frac），不碰测试集
+# 命令行复现：python -m core.cli train configs/train_within_subject.yaml
+#
+# 对照（该基准的两种 task_mode）：
+#   Cross    → 本项目 `loso` / `subject_kfold`（跨被试）
+#   Fewshot  → 本项目本文件（被试内、按比例抽取）
+experiment:
+  name: csp_lda_within_subject
+  note: "被试内少样本：每被试一折 + 每类 30% 训练（对齐 EEG-FM-Benchmark Fewshot）"
+
+data:
+  processed_dir: processed/bnci2014001
+
+model:
+  name: csp_lda
+  params: {n_components: 6}
+
+split:
+  scheme: within
+  train_percentage: 0.3   # 每被试每类用于训练的比例（0.3 = 每类 30%）
+  n_repeats: 1            # 1 = 每被试一折；>1 则折数 = 被试数 × n_repeats
+  val_frac: 0.15
+  seed: 42
+
+normalization: {mode: zscore_channel, euclidean_alignment: false}
+augmentation: {}
+trainer: {epochs: 60, batch_size: 64, lr: 0.001, device: auto}
+class_balance: {weighted_loss: true}

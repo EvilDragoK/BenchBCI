@@ -1,0 +1,28 @@
+# 跨数据集迁移：在「源域」预处理数据上训练，直接到「目标域」数据上测试。
+# 要求两个域：通道数、epoch 时长一致，且类别集合相同（标签会自动对齐）。
+# 命令行复现：python -m core.cli train configs/train_cross_dataset.yaml
+#
+# 本例用 BNCI2014001 的 T / E 两个 session 分别做成两份预处理数据来演示；
+# 真实跨数据集（如 2a→2b、PhysioNet→2a）只需把 test_processed_dir 换成另一个
+# 数据集的预处理输出目录即可。
+experiment:
+  name: csp_lda_cross_dataset
+  note: "跨数据集迁移：源域 T → 目标域 E"
+
+data:
+  processed_dir: processed/bnci2014001_T        # 源域（训练）
+  test_processed_dir: processed/bnci2014001_E   # 目标域（测试）
+
+model:
+  name: csp_lda
+  params: {n_components: 6}
+
+split:
+  scheme: cross_dataset
+  val_frac: 0.15        # 验证集从源域内部划出
+  seed: 42
+
+normalization: {mode: zscore_channel, euclidean_alignment: false}
+augmentation: {}
+trainer: {epochs: 60, batch_size: 64, lr: 0.001, device: auto}
+class_balance: {weighted_loss: true}
